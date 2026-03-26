@@ -1,3 +1,7 @@
+import sys
+# 🔥 FIX: Make pickle find bin_mapping
+sys.modules['__main__'] = sys.modules[__name__]
+
 import streamlit as st
 import pandas as pd
 import joblib
@@ -49,6 +53,7 @@ def get_feature_names(preprocessor):
     return feature_names
 
 
+@st.cache_resource
 def load_model():
     return joblib.load("churn_pipeline_v2.pkl")
 
@@ -161,13 +166,12 @@ if predict_btn:
     # -------- VISUAL SHAP --------
     st.subheader("Visual Explanation")
 
-    # Inject clean names into SHAP object
-    shap_values.feature_names = clean_names
+    shap_values.feature_names = clean_names  # 🔥 fix labels
 
     fig, ax = plt.subplots()
     shap.plots.waterfall(
         shap_values[0],
-        max_display=10, 
+        max_display=10,
         show=False
     )
     st.pyplot(fig)
