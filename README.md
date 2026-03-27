@@ -81,12 +81,8 @@ streamlit run app.py
 
 ## 📈 Model Performance
 
-* Accuracy: XX%
-* Precision: XX%
-* Recall: XX%
-* F1 Score: XX%
+<img width="444" height="206" alt="image" src="https://github.com/user-attachments/assets/853db8f2-f736-4dd8-8ea7-f6c2510cdfc5" />
 
-*(Update with your actual results)*
 
 ---
 
