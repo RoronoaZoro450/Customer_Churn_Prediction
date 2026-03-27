@@ -114,7 +114,6 @@ Example:
 * Add real-time data pipeline
 * Deploy using Docker / Cloud
 * Integrate database (PostgreSQL)
-* Add retention recommendation system
 
 ---
 
