@@ -55,7 +55,7 @@ def get_feature_names(preprocessor):
 
 @st.cache_resource
 def load_model():
-    return joblib.load("churn_pipeline_v2.pkl")
+    return joblib.load("churn_pipeline_v1.pkl")
 
 
 # ================== CORE FUNCTION ==================
