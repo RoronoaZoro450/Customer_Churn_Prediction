@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import plotly.express as px
 import pandas as pd
-API_URL = "http://127.0.0.1:8000"
+API_URL = "https://customer-churn-prediction-retention-nwue.onrender.com"
 
 
 # --- Custom CSS for styling ---
