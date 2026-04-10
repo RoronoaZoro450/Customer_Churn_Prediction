@@ -1,197 +1,216 @@
-import sys
-# 🔥 FIX: Make pickle find bin_mapping
-sys.modules['__main__'] = sys.modules[__name__]
-
 import streamlit as st
+import requests
+import plotly.express as px
 import pandas as pd
-import joblib
-import shap
-import matplotlib.pyplot as plt
-
-# ================== HELPERS ==================
-
-def bin_mapping(X):
-    X = X.copy()
-    binary_cols = ["OnlineSecurity", "OnlineBackup", "DeviceProtection", "TechSupport"]
-    for col in binary_cols:
-        X[col] = X[col].map({
-            'Yes': 1,
-            'No': 0,
-            'No internet service': 0
-        })
-    return X
+API_URL = "http://127.0.0.1:8000"
 
 
-def clean_feature_name(feature):
-    if "cat__" in feature:
-        parts = feature.split("__")[1]
-        if "_" in parts:
-            col, val = parts.split("_", 1)
-            return f"{col} = {val}"
-    elif "num__" in feature:
-        return feature.split("__")[1]
-    elif "bin__" in feature:
-        return feature.split("__")[1]
-    return feature
+# --- Custom CSS for styling ---
+
+st.set_page_config(
+    page_title="Customer Churn AI",
+    page_icon="📉",  
+    layout="wide"
+)
+
+st.markdown("""
+<style>
+/* Card Container */
+.card {
+    background-color: #111827;
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    border-left: 5px solid #6366f1;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+/* Title */
+.card-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #e5e7eb;
+}
+
+/* Description */
+.card-desc {
+    font-size: 14px;
+    color: #9ca3af;
+    margin-top: 6px;
+}
+
+/* Section headers */
+.section-header {
+    font-size: 22px;
+    font-weight: bold;
+    color: #f9fafb;
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+/* Strategy box */
+.strategy-box {
+    background-color: #1f2937;
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    border-left: 4px solid #10b981;
+}
+
+/* Label */
+.label {
+    font-weight: bold;
+    color: #34d399;
+}
+</style>
+""", unsafe_allow_html=True)
 
 
-def get_feature_names(preprocessor):
-    feature_names = []
+st.title("📊 Customer Churn Predictor")
 
-    for name, transformer, cols in preprocessor.transformers_:
-        if name == "bin":
-            feature_names.extend(cols)
-
-        elif name == "num":
-            feature_names.extend(cols)
-
-        elif name == "cat":
-            ohe = transformer
-            encoded = ohe.get_feature_names_out(cols)
-            feature_names.extend(encoded)
-
-    return feature_names
-
-
-@st.cache_resource
-def load_model():
-    return joblib.load("churn_pipeline_v1.pkl")
-
-
-# ================== CORE FUNCTION ==================
-
-def predict_churn_and_shap_analysis(input_df):
-    model = load_model()
-
-    prediction = model.predict(input_df)[0]
-    probability = model.predict_proba(input_df)[0][1]
-
-    preprocessor = model.named_steps['preprocessor']
-    classifier = model.named_steps['classifier']
-
-    X_transformed = preprocessor.transform(input_df)
-
-    explainer = shap.TreeExplainer(classifier)
-    shap_values = explainer(X_transformed)
-
-    return prediction, probability, shap_values, preprocessor
-
-
-# ================== STREAMLIT UI ==================
-
-st.title("📊 Customer Churn Prediction System")
-
-option = ["Yes", "No", "No internet service"]
-
+# --- Input Form ---
 with st.sidebar:
     st.header("Enter Customer Details")
 
-    tenure = st.number_input("Tenure (months)", min_value=0, step=1)
-    internet_service = st.selectbox("Internet Service", ["DSL", "Fiber optic", "No"])
-    online_security = st.selectbox("Online Security", option)
-    online_backup = st.selectbox("Online Backup", option)
-    device_protection = st.selectbox("Device Protection", option)
-    tech_support = st.selectbox("Tech Support", option)
-    contract = st.selectbox("Contract Type", ["Month-to-month", "One year", "Two year"])
-    payment_method = st.selectbox("Payment Method", [
-        "Electronic check", "Mailed check",
-        "Bank transfer (automatic)", "Credit card (automatic)"
+    customer_id = st.text_input("Customer ID")
+    name = st.text_input("Name")
+    tenure = st.number_input("Tenure (months)", min_value=0)
+
+    internet = st.selectbox("Internet Service", ["DSL", "Fiber optic", "No"])
+    security = st.selectbox("Online Security", ["Yes", "No", "No internet service"])
+    backup = st.selectbox("Online Backup", ["Yes", "No", "No internet service"])
+    device = st.selectbox("Device Protection", ["Yes", "No", "No internet service"])
+    support = st.selectbox("Tech Support", ["Yes", "No", "No internet service"])
+
+    contract = st.selectbox("Contract", ["Month-to-month", "One year", "Two year"])
+    payment = st.selectbox("Payment Method", [
+        "Electronic check",
+        "Mailed check",
+        "Bank transfer (automatic)",
+        "Credit card (automatic)"
     ])
-    monthly_charges = st.number_input("Monthly Charges", min_value=0.0, step=1.0)
 
-    total_charges = tenure * monthly_charges
-    st.markdown(f"**Total Charges: ₹{total_charges:.2f}**")
+    monthly = st.number_input("Monthly Charges", min_value=0.0)
+    
+    predict_button = st.button("🔮 Predict Churn")
 
-    predict_btn = st.button("Predict")
-
-
-# ================== INPUT ==================
-
-input_data = {
+# --- Create Payload ---
+data = {
+    "customer_id": customer_id,
+    "name": name,
     "tenure": tenure,
-    "InternetService": internet_service,
-    "OnlineSecurity": online_security,
-    "OnlineBackup": online_backup,
-    "DeviceProtection": device_protection,
-    "TechSupport": tech_support,
+    "InternetService": internet,
+    "OnlineSecurity": security,
+    "OnlineBackup": backup,
+    "DeviceProtection": device,
+    "TechSupport": support,
     "Contract": contract,
-    "PaymentMethod": payment_method,
-    "MonthlyCharges": monthly_charges,
-    "TotalCharges": total_charges
+    "PaymentMethod": payment,
+    "MonthlyCharges": monthly
 }
 
-input_df = pd.DataFrame([input_data])
-input_df['TotalCharges'] = pd.to_numeric(input_df['TotalCharges'], errors='coerce')
+# --- Buttons ---
+
+# --- Predict Button ---
+if predict_button:
+    res = requests.post(f"{API_URL}/predict", json=data)
+
+    if res.status_code == 200:
+        result = res.json()
+        st.success(f"Prediction: {result['churn_prediction']}")
+        
+        st.metric(label="Churn Probability", value=f"{result['probability']*100:.2f}%", delta="High", delta_color="inverse")
+
+        shap_items = list(result["shap_values"].items())
+        df_shap = pd.DataFrame(shap_items, columns=['Feature', 'SHAP Value'])
+        
+
+        df_shap = df_shap.sort_values(by='SHAP Value', ascending=True)
+            
+
+        df_shap['Color'] = df_shap['SHAP Value'].apply(
+            lambda x: 'Increases Risk' if x > 0 else 'Reduces Risk'
+        )
 
 
-# ================== OUTPUT ==================
+        fig = px.bar(
+            df_shap, 
+            x='SHAP Value', 
+            y='Feature', 
+            orientation='h',
+            color='Color',
+            color_discrete_map={'Increases Risk': '#ef553b', 'Reduces Risk': '#636efa'},
+            title="<b>Why is this customer churning?</b>",
+            height=600 
+        )
 
-st.subheader("Prediction Result")
+        st.plotly_chart(fig, use_container_width=True)
 
-if predict_btn:
-    prediction, probability, shap_values, preprocessor = predict_churn_and_shap_analysis(input_df)
-
-    # -------- Prediction --------
-    if prediction == 1:
-        st.error(f"⚠️ Customer will churn ({probability:.2%} probability)")
-    else:
-        st.success(f"✅ Customer will stay ({1 - probability:.2%} confidence)")
-
-    # -------- SHAP TABLE --------
-    st.subheader("SHAP Explanation")
-
-    feature_names = get_feature_names(preprocessor)
-    clean_names = [clean_feature_name(f) for f in feature_names]
-
-    shap_value = shap_values.values[0]
-
-    shap_df = pd.DataFrame({
-        "Feature": clean_names,
-        "Impact": shap_value
-    }).sort_values(by="Impact", key=abs, ascending=False)
-
-    st.dataframe(shap_df)
-
-    # -------- TEXT EXPLANATION --------
-    st.subheader("Why this prediction?")
-
-    top_features = shap_df.head(5)
-
-    for _, row in top_features.iterrows():
-        if row["Impact"] > 0:
-            st.write(f"🔺 **{row['Feature']}** increases churn likelihood")
-        else:
-            st.write(f"🔻 **{row['Feature']}** decreases churn likelihood")
-
-    # -------- VISUAL SHAP --------
-    st.subheader("Visual Explanation")
-
-    shap_values.feature_names = clean_names  # 🔥 fix labels
-
-    fig, ax = plt.subplots()
-    shap.plots.waterfall(
-        shap_values[0],
-        max_display=10,
-        show=False
-    )
-    st.pyplot(fig)
-
-    # -------- BUSINESS INSIGHT --------
-    st.subheader("AI Insight")
-
-    if prediction == 1:
-        st.warning("🚨 High churn risk detected")
-
-        risky_features = top_features[top_features['Impact'] > 0]['Feature'].values
-
-        if any("MonthlyCharges" in f for f in risky_features):
-            st.write("👉 Customer may be price sensitive")
-
-        if any("TechSupport" in f for f in risky_features):
-            st.write("👉 Offer tech support to improve retention")
-
-        if any("Contract" in f for f in risky_features):
-            st.write("👉 Suggest long-term contract plans")
 
     else:
-        st.success("Customer is stable")
+        st.error(f"Error: {res.text}")
+
+# --- Explain Button ---
+if st.button("Recommend Retention Actions"):
+    res = requests.post(f"{API_URL}/explain", json=data)
+
+    if res.status_code == 200:
+        explanation = res.json()
+
+        
+        st.markdown('<div class="section-header">⚠️ Reasons for Churn</div>', unsafe_allow_html=True)
+
+        for index, reason in enumerate(explanation["top_reasons"]):
+            st.markdown(f"""
+            <div class="card">
+                <div class="card-title">{index + 1}. {reason['reason']}</div>
+                <div class="card-desc">{reason['description']}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        
+        st.markdown('<div class="section-header">💡 Retention Strategy</div>', unsafe_allow_html=True)
+
+        strategy = explanation["retention_strategy"]
+
+        st.markdown(f"""
+        <div class="strategy-box">
+            <span class="label">Immediate Action:</span><br>
+            {strategy['immediate_action']}
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <div class="strategy-box">
+            <span class="label">Short-term Action:</span><br>
+            {strategy['targeted_action']}
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <div class="strategy-box">
+            <span class="label">Long-term Action:</span><br>
+            {strategy['long_term_action']}
+        </div>
+        """, unsafe_allow_html=True)
+
+    else:
+        st.error(f"Error: {res.text}")
+
+# --- Save Button ---
+if st.button("💾 Save Customer"):
+    res = requests.post(f"{API_URL}/create", json=data)
+    if res.status_code == 200:
+        st.success("Customer saved to Supabase!")
+    else:
+        st.error(res.text)
+
+if st.button("🔍 View All Customers"):
+    res = requests.get(f"{API_URL}/view")
+    if res.status_code == 200:
+        customers = res.json()
+        df_customers = pd.DataFrame(customers)
+        st.dataframe(df_customers)
+    else:
+        st.error(f"Error: {res.text}")
+
