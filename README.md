@@ -1,110 +1,149 @@
-# 🚀 Customer Churn Prediction & Retention System
+# Customer Churn Prediction & Retention System
 
-An end-to-end **AI-powered churn prediction system** that not only predicts customer churn but also provides **explainable insights and actionable retention strategies** using Machine Learning, SHAP, and LLMs.
+An end-to-end ML system that predicts telecom customer churn, explains the prediction using SHAP feature importance, and generates actionable retention strategies via an LLM.
 
----
-
-## 🌐 Live Demo
-
-* 🔗 Frontend (Streamlit): https://customerchurnpredictionandretention.streamlit.app
-* 🔗 API (FastAPI - Render): https://customer-churn-prediction-retention-nwue.onrender.com/docs
+**Live Demo:**
+- Frontend (Streamlit): https://customerchurnpredictionandretention.streamlit.app
+- API (FastAPI on Render): https://customer-churn-prediction-retention-nwue.onrender.com/docs
 
 ---
 
-## 🧠 Key Features
+## What it does
 
-* 📊 **Churn Prediction** using Machine Learning (Gradient Boosting)
-* 🔍 **Explainability with SHAP** (feature-level contribution analysis)
-* 🤖 **AI-powered Retention Strategy** using LLM (HuggingFace)
-* 🗄️ **Database Integration** with Supabase
-* ⚡ **FastAPI Backend** (high-performance API)
-* 🎨 **Interactive UI** built with Streamlit
-* 🐳 **Dockerized Backend** for scalable deployment
-* ☁️ **Cloud Deployment**
-
-  * Backend → Render
-  * Frontend → Streamlit Cloud
+A customer's data is submitted through a Streamlit UI. The FastAPI backend runs it through a trained Gradient Boosting pipeline, computes SHAP values to identify which features drove the prediction, and optionally calls Llama 3.1 via HuggingFace Inference API to generate a structured retention strategy (immediate, targeted, and long-term actions). Predictions and customer records are stored in Supabase.
 
 ---
 
-## 🏗️ System Architecture
+## Architecture
 
 ```
-User (Browser)
-     ↓
-Streamlit Frontend (Cloud)
-     ↓
+Streamlit Frontend (Streamlit Cloud)
+        |
+        | HTTP (REST)
+        v
 FastAPI Backend (Render)
-     ↓
-ML Model + SHAP + LLM
-     ↓
-Supabase Database
+        |
+   ┌────┴────┐
+   |         |
+ML Pipeline  Supabase DB
+(GB + SHAP)
+   |
+LangChain → HuggingFace
+(Llama 3.1-8B)
 ```
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
-### 🔹 Backend
-
-* FastAPI
-* Scikit-learn
-* SHAP
-* LangChain
-* HuggingFace (Llama 3.1)
-
-### 🔹 Frontend
-
-* Streamlit
-* Plotly
-
-### 🔹 Database
-
-* Supabase
-
-### 🔹 Deployment
-
-* Docker
-* Render
-* Streamlit Cloud
+| Layer | Technology |
+|---|---|
+| ML Model | scikit-learn (Gradient Boosting + ColumnTransformer pipeline) |
+| Explainability | SHAP (TreeExplainer) |
+| LLM | Llama 3.1-8B-Instruct via HuggingFace Inference API |
+| LLM Orchestration | LangChain, PydanticOutputParser |
+| Backend API | FastAPI + Pydantic |
+| Database | Supabase (PostgreSQL) |
+| Frontend | Streamlit + Plotly |
+| Deployment | Docker (backend on Render), Streamlit Cloud (frontend) |
 
 ---
 
-## ⚙️ API Endpoints
+## API Endpoints
 
-| Endpoint   | Description                        |
-| ---------- | ---------------------------------- |
-| `/predict` | Predict customer churn             |
-| `/explain` | Explain churn + retention strategy |
-| `/create`  | Save customer to database          |
-| `/view`    | View all customers                 |
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/` | Health check |
+| POST | `/predict` | Returns churn probability + SHAP values |
+| POST | `/explain` | Returns top 3 churn reasons + LLM retention strategy |
+| POST | `/create` | Saves customer record to Supabase |
+| GET | `/view` | Returns all stored customers |
 
----
+### Example `/predict` request
 
-## 📊 Example Output
-
-* Churn Probability Score
-* SHAP Feature Contributions
-* Top 3 Reasons for Churn
-* AI-generated Retention Strategy
-
----
-
-## 🔐 Environment Variables
-
-Create a `.env` file locally:
-
-```
-SUPABASE_URL=your_supabase_url
-SUPABASE_KEY=your_service_role_key
-HUGGINGFACEHUB_API_TOKEN=your_token
+```json
+{
+  "customer_id": 101,
+  "name": "John Doe",
+  "tenure": 3,
+  "InternetService": "Fiber optic",
+  "OnlineSecurity": "No",
+  "OnlineBackup": "No",
+  "DeviceProtection": "No",
+  "TechSupport": "No",
+  "Contract": "Month-to-month",
+  "PaymentMethod": "Electronic check",
+  "MonthlyCharges": 85.0
+}
 ```
 
-⚠️ Do NOT commit `.env` to GitHub.
+### Example `/predict` response
+
+```json
+{
+  "customer_id": 101,
+  "churn_prediction": "Yes",
+  "probability": 0.823,
+  "shap_values": {
+    "tenure": -0.42,
+    "Contract_Month-to-month": 0.61,
+    "InternetService_Fiber optic": 0.38,
+    ...
+  }
+}
+```
 
 ---
 
-## 🐳 Docker Setup (Backend)
+## Input Features
+
+| Feature | Type | Values |
+|---|---|---|
+| `tenure` | int | Months with company (≥ 0) |
+| `InternetService` | categorical | DSL / Fiber optic / No |
+| `OnlineSecurity` | categorical | Yes / No / No internet service |
+| `OnlineBackup` | categorical | Yes / No / No internet service |
+| `DeviceProtection` | categorical | Yes / No / No internet service |
+| `TechSupport` | categorical | Yes / No / No internet service |
+| `Contract` | categorical | Month-to-month / One year / Two year |
+| `PaymentMethod` | categorical | Electronic check / Mailed check / Bank transfer / Credit card |
+| `MonthlyCharges` | float | > 0 |
+| `TotalCharges` | computed | `MonthlyCharges × tenure` (auto-calculated) |
+
+---
+
+## Local Setup
+
+**Prerequisites:** Python 3.10+, pip
+
+```bash
+# Clone
+git clone https://github.com/RoronoaZoro450/Customer_Churn_Prediction.git
+cd Customer_Churn_Prediction
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Set up environment variables
+cp .env.example .env
+# Fill in SUPABASE_URL, SUPABASE_KEY, HUGGINGFACEHUB_API_TOKEN
+```
+
+**Run the API:**
+```bash
+uvicorn api:app --reload
+# API available at http://localhost:8000
+# Swagger docs at http://localhost:8000/docs
+```
+
+**Run the frontend** (update `API_URL` in `app.py` to `http://localhost:8000` first):
+```bash
+streamlit run app.py
+```
+
+---
+
+## Docker (Backend)
 
 ```bash
 docker build -t churn-api .
@@ -113,56 +152,32 @@ docker run --env-file .env -p 8000:8000 churn-api
 
 ---
 
-## 🚀 Local Setup
+## Environment Variables
 
-```bash
-# Clone repo
-git clone https://github.com/your-username/your-repo.git
+```
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_KEY=your_supabase_service_role_key
+HUGGINGFACEHUB_API_TOKEN=your_hf_token
+```
 
-# Install dependencies
-pip install -r requirements.txt
+Never commit `.env` to version control.
 
-# Run FastAPI
-uvicorn api:app --reload
+---
 
-# Run Streamlit
-streamlit run app.py
+## Project Structure
+
+```
+├── api.py                      # FastAPI backend (predict, explain, create, view)
+├── app.py                      # Streamlit frontend
+├── churn_pipeline_v1.pkl       # Trained sklearn pipeline (GB + preprocessor)
+├── Customer_Churn_Prediction.ipynb  # Model training and EDA
+├── requirements.txt
+├── Dockerfile
+└── .dockerignore
 ```
 
 ---
 
-## 💡 Future Improvements
+## Dataset
 
-* 🔄 Async API calls for LLM
-* ⚡ Caching responses (Redis)
-* 📈 Advanced dashboard analytics
-* 🔐 Authentication system
-* 📊 Model monitoring & retraining
-
----
-
-## 👨‍💻 Author
-
-**Your Name**
-
----
-
-## ⭐ Acknowledgements
-
-* HuggingFace
-* Supabase
-* Streamlit
-* FastAPI
-
----
-
-## 💣 Note
-
-This project demonstrates a **production-level ML system** combining:
-
-* Prediction
-* Explainability
-* AI reasoning
-* Cloud deployment
-
----
+Based on the [IBM Telco Customer Churn dataset](https://www.kaggle.com/datasets/blastchar/telco-customer-churn). The model uses 10 features selected from the full dataset.
